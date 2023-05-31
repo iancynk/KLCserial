@@ -14,6 +14,7 @@ FLAG_DEBUG = False
 
 # %% ---------------------------------------------------------------------------
 # COMMANDS
+
 commands = {
     "identify":         "23 02 00 00 50 01", # flashes the screen of the specified device
     "disconnect":       "02 00 00 00 50 01", # inform device of a pending disconnect
@@ -70,10 +71,9 @@ def int_to_hexstr(value_num : float, signed=True):
 # SERIAL FUNCTIONS
 
 # create a serial connection with the recommended parameters
-def openKLC(port='', LC_ID = ''):
-    """create a serial connection with the recommended parameters
-    if no port is given the function will try all available serial ports
-    and check whether the connected device has an ID like an IO laser. 
+def openKLC(port='', SN = ''):
+    """create a serial connection with the recommended parameters to either the defined port
+    or to a specified serial number SN
     """
     s = serial.Serial()
     s.baudrate = 115200
@@ -87,7 +87,7 @@ def openKLC(port='', LC_ID = ''):
     if not port:
         # find available ports depending on operating system
         if sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
-            available_ports = glob.glob('/dev/serial/by-id/*Kinesis_LC_Controller*' + LC_ID + '*')
+            available_ports = glob.glob('/dev/serial/by-id/*Kinesis_LC_Controller*' + SN + '*')
         elif sys.platform.startswith('win'):
             available_ports = ['COM%s' % (i + 1) for i in range(256)]
         else:
@@ -209,6 +209,7 @@ def decode_reply(reply):
 
 # %% ---------------------------------------------------------------------------
 # CONTROLLER INFO/FUNCTIONS
+
 def identify(s):
     """flash display to indicate which controller is addressed"""
     if not s.is_open: print('no serial connection'); return
@@ -230,6 +231,7 @@ def get_serial(s):
     serial_hex = message_params[12:24]  # serial number encoded in bytes 4..7 (starting at 0)
     serial_num = hexstr_to_int(serial_hex)
     print('serial number: ', f"{serial_num:010d}")  # give out integer value
+    # yeah, apparently the serial number is always 75d...
 
 
 def get_info(s):
@@ -296,6 +298,7 @@ def set_disp_params(s, brightness=90, timeout=-1):
 
 # %% ---------------------------------------------------------------------------
 # CHANNEL OUTPUT CONTROL FUNCTIONS
+
 def get_chan_status(s, channel=1):
     """"get hardware channel status"""
     if not s.is_open: print('no serial connection'); return
@@ -328,6 +331,7 @@ def dis_chan(s, channel=1):
 
 # %% ---------------------------------------------------------------------------
 # CONTROL SETTINGS
+
 def set_voltage(s, voltage : float, channel=1):
     """"set output voltage (0..25)"""
     if not s.is_open: print('no serial connection'); return
@@ -386,6 +390,7 @@ def get_freq(s, channel=1):
 
 # %% ---------------------------------------------------------------------------
 # ADC mode control
+
 def get_ADCinmode(s):
     """"get ADC input mode"""
     if not s.is_open: print('no serial connection'); return
@@ -434,4 +439,6 @@ def get_ADCparams(s):
     ADMAX_Value = hexstr_to_int(message_params[12:17], signed=False)
     print('ADC error: ', ADC_error)
     print('ADMAX value: ', ADMAX_Value)
+
+
 # EOF --------------------------------------------------------------------------
