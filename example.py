@@ -10,7 +10,9 @@ import KLCserial as klc
 # %%
 # connect controller
 c = klc.openKLC()
-# s = klc.openKLC('/dev/ttyUSB0')  # connect stage with specified port
+# SN = '39342867'
+# c = klc.openKLC(SN=SN)  # connect controller with specified serial number
+# c = klc.openKLC('/dev/ttyUSB0')  # connect controller with specified port
 
 # let the display flash
 klc.identify(c)

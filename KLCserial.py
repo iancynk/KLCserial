@@ -80,23 +80,33 @@ def openKLC(port='', SN = ''):
     s.bytesize = serial.EIGHTBITS
     s.parity = serial.PARITY_NONE
     s.stopbits = serial.STOPBITS_ONE # number of stop bits
-    s.timeout = 5
+    s.timeout = 2
     s.rtscts = True # enable hardware (TRS/CTS) flow control
-    #print(s)
     
     if not port:
         # find available ports depending on operating system
         if sys.platform.startswith('linux') or sys.platform.startswith('cygwin'):
-            available_ports = glob.glob('/dev/serial/by-id/*Kinesis_LC_Controller*' + SN + '*')
+            ports = glob.glob('/dev/serial/by-id/*Kinesis_LC_Controller*' + SN + '*')
+            if not ports:
+                print('selected SN', SN, 'not available')
+                available_ports = glob.glob('/dev/serial/by-id/*Kinesis_LC_Controller*')
+                print('available SNs:')
+                print(available_ports)
         elif sys.platform.startswith('win'):
-            available_ports = ['COM%s' % (i + 1) for i in range(256)]
+            ports = ['COM%s' % (i + 1) for i in range(256)]
         else:
             raise EnvironmentError('Unsupported platform')
     else:
-        available_ports = [port]
+        ports = [port]
     
     # try to open the ports until one works
-    for port in available_ports:
+    if not ports:
+        print('no serial port selected, aborting')
+        s = ''
+        return s
+    
+    # try to open the selected port(s) until one works
+    for port in ports:
         try:
             print('opening port', port)
             s.port = port
@@ -106,11 +116,11 @@ def openKLC(port='', SN = ''):
         except:
             print('failed at port', port)
             pass
+    
     if s.is_open:
         print('is open: ', s.is_open)
     else:
-        print('could not find any serial port')
-        s = ''
+        print('opening failed somehow')
     return s
 
 
