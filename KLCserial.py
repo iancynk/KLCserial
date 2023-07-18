@@ -192,8 +192,8 @@ def decode_reply(reply):
         message = 'output voltage'
         length = 6
     elif mID == '06 00':
-        message = 'hardware info' + reply[17:269]
-        length = 90
+        message = 'hardware info'
+        length = 90  # or 84? or 86?
     elif mID == '07 20':
         message = 'output frequency'
         length = 6
@@ -317,9 +317,17 @@ def get_info(s):
     if not s.is_open: print('no serial connection'); return
     sendcommand(s, commands['req_info'])
     reply = recvreply(s)
-    message, message_params = decode_reply(reply)
-    print('raw reply:', reply)
-    print('sorry, decoding not implemented yet, check APT protocol page 46')
+    message, hwinfo = decode_reply(reply)
+    sn = hwinfo[6:17] # 4 byte
+    model_number = hwinfo[18:41] # 8 byte
+    hw_type = hwinfo[42:47] # 2 byte
+    fw_minor = hwinfo[48:50] # 1 byte
+    fw_interim = hwinfo[51:53] # 1 byte
+    fw_majorr = hwinfo[54:56] # 1 byte
+    hw_version = hwinfo[-17:-14] # 2 byte
+    mode_state = hwinfo[-12:-7] # 2 byte
+    n_channels = hwinfo[-5:] # 2 byte
+    print('raw hwinfo:', hwinfo)
 
 
 # %% ---------------------------------------------------------------------------
