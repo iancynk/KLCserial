@@ -17,18 +17,15 @@ FLAG_DEBUG = False
 
 commands = {
     "identify":         "23 02 00 00 50 01", # flashes the screen of the specified device
-    "disconnect":       "02 00 00 00 50 01", # inform device of a pending disconnect
     "req_info":         "05 00 00 00 50 01", # get hardware info (4+84 byte)
     "req_serial":       "15 00 00 00 50 01", # get serial number (6 + 40 byte)
     "set_serial":       "14 00 28 00 d0 01", # set serial number (+4+4+8 byte)
-
     "enable_HWchan":    "10 02 01 01 50 01", # enable HW channel (3rd byte defines channel)
     "disable_HWchan":   "10 02 01 02 50 01", # disable HW channel (3rd byte defines channel), x02 means "off"
     "req_HWchan_status":"11 02 01 00 50 01", # get HW device channel status (3rd byte defines channel)
-    "unlock_wheel":     "50 02 00 01 50 01", # unlock the wheel on top of the device
-    "lock_wheel":       "50 02 00 02 50 01", # lock the wheel on top of the device
+    "lock_wheel":       "50 02 00 01 50 01", # lock the wheel on top of the device
+    "unlock_wheel":     "50 02 00 02 50 01", # unlock the wheel on top of the device
     "wheel_status":     "51 02 00 00 50 01", # request wheel lock status
-
     "set_voltage":      "01 20 06 00 d0 01", # set output voltage (+6 byte)
     "req_voltage":      "02 20 01 01 50 01", # get output voltage (4th part could be 01 or 02) (6+6 byte)
     "set_frequency":    "05 20 06 00 d0 01", # set frequency (+6 byte)
@@ -39,15 +36,15 @@ commands = {
     "set_trigger_mode": "0b 20 01 01 50 01", # set device trigger pin mode (4th byte sets mode)
     "req_trigger_mode": "0c 20 01 00 50 01", # get device trigger pin mode
     "req_ADCparams":    "0e 20 01 00 50 01", # get ADC parameters (6+4 bytes)
-    "set_swfreq":       "10 20 06 00 d0 01", # set device switching frequency (+4 byte)
+    "set_swfreq":       "10 20 04 00 d0 01", # set device switching frequency (+4 byte)
     "req_swfreq":       "11 20 01 00 50 01", # get device switching frequency (6+4 byte)
-    "enable_chan_V1":   "16 20 01 01 50 01", # enable channel V1 (4th byte defines output mode)
-    "enable_chan_V2":   "16 20 01 02 50 01", # enable channel V2 (4th byte defines output mode)
-    "enable_chan_sw":   "16 20 01 02 50 01", # enable switching V1-V2 (4th byte defines output mode)
-    "disable_chan":     "16 20 01 00 50 01", # disable channel (4th byte defines output mode)
-    "req_chan_status":  "17 20 01 00 50 01", # get device channel status (3rd byte defines channel) (not working?)
-    "set_LUT_values":   "20 20 06 00 d0 01", # set device LUT values (+6 byte)
-    "req_LUT_values":   "21 20 01 00 50 01", # get device LUT values (6+6 byte)
+    "mode_chan_V1":     "16 20 01 01 50 01", # set channel V1 (4th byte defines output mode)
+    "mode_chan_V2":     "16 20 01 02 50 01", # set channel V2 (4th byte defines output mode)
+    "mode_chan_sw":     "16 20 01 03 50 01", # set switching V1-V2 (4th byte defines output mode)
+    "mode_chan_off":    "16 20 01 00 50 01", # set channel off (4th byte defines output mode)
+    "req_chan_mode":    "17 20 01 00 50 01", # get device channel status (3rd byte defines channel) (not working?)
+    "set_LUT_value":    "20 20 06 00 d0 01", # set device LUT values (+6 byte)
+    "req_LUT_value":    "21 20 01 00 50 01", # get device LUT values (6+6 byte)
     "set_LUT_params":   "23 20 1e 00 d0 01", # set LUT parameters (+30 byte)
     "req_LUT_params":   "24 20 01 00 50 01", # get LUT paramaters (6+30 byte)
     "start_LUT_output": "26 20 01 00 50 01", # start LUT output
@@ -87,6 +84,25 @@ def int_to_hexstr(value_num : float, signed=True, bytenum=2):
         value_hex = value_hex + ' ' + format(value_bytes[n], '02x')
     if FLAG_DEBUG: print(value_bytes.hex(), value_hex)
     return value_hex
+
+
+def hexstr_to_ascii(hexstr):
+    """ convert a string of hex values to ASCII characters
+    only used to read out the model name
+    """
+    # remove whitespace
+    hexstr = "".join(hexstr.split())
+    asciistr = ""
+    for i in range(0, len(hexstr), 2):
+        # extract two characters from hex string
+        part = hexstr[i : i + 2]
+        # change it into base 16 and typecast as character
+        ch = chr(int(part, 16))
+        asciistr += ch
+    # strip zeros
+    asciistr = asciistr.strip('\x00')
+    return asciistr
+
 
 # %% ---------------------------------------------------------------------------
 # SERIAL FUNCTIONS
@@ -164,8 +180,7 @@ def sendcommand(s, command : str):
 # receive and parse reply
 def recvreply(s):
     if not s.is_open: print('no serial connection'); return
-    time.sleep(0.04) # has to be at least 20 ms to work on my computer
-    # print('bytes in queue: ', s.in_waiting)
+    time.sleep(0.04) # has to be at least 20 ms to work
     reply = ''
     while s.in_waiting > 0:
         # read every single byte (converted to hex) and add whitespace
@@ -188,12 +203,15 @@ def decode_reply(reply):
     message_params = ''
     if FLAG_DEBUG: print(reply)
     
-    if mID == '03 20':
+    if mID == '02 00':
+        message = 'pending disconnect'
+        length = 0
+    elif mID == '03 20':
         message = 'output voltage'
         length = 6
     elif mID == '06 00':
         message = 'hardware info'
-        length = 90  # or 84? or 86?
+        length = 84
     elif mID == '07 20':
         message = 'output frequency'
         length = 6
@@ -201,27 +219,31 @@ def decode_reply(reply):
         message = 'analog input mode'
         analog_mode = reply[10]
         return analog_mode
-    elif mID == '0b 20':
+    elif mID == '0d 20':
         message = 'trigger pin mode'
         trigger_pin_mode = reply[10]
         return trigger_pin_mode
     elif mID == '0f 20':
         message = 'ADC parameters'
         length = 6
-    elif (mID == '12 02') or (mID == '18 20'):
+    elif mID == '12 02':
         message = 'channel status'
         channel = reply[7]
         channel_status = reply[10]
         return channel_status
     elif mID == '12 20':
         message = 'switching frequency'
-        length = 4  # maybe 6?
+        length = 4
     elif mID == '16 00':
         message = 'serial number'
         length = 40
+    elif mID == '18 20':
+        message = 'channel mode'
+        channel_mode = reply[10]
+        return channel_mode
     elif mID == '22 20':
-        message = 'LUT values'
-        length = 6  # possibly 4?
+        message = 'LUT value'
+        length = 6
     elif mID == '25 20':
         message = 'LUT parameters'
         length = 30
@@ -263,12 +285,6 @@ def identify(s):
     sendcommand(s, commands['identify'])
 
 
-def disconnect(s):
-    """inform device of a pending disconnect"""
-    if not s.is_open: print('no serial connection'); return
-    sendcommand(s, commands['disconnect'])
-
-
 def get_serial(s):
     """get controller serial number"""
     if not s.is_open: print('no serial connection'); return
@@ -301,7 +317,7 @@ def set_serial(s, new_SN : str):
         return
     # read previous serial number
     old_SN = get_serial(s)
-    print('previous SN:', old_SN)
+    print('previous SN :', old_SN)
     # convert serial number
     new_SN_hexstr = int_to_hexstr(int(new_SN), bytenum=4)
     command = f"{commands['set_serial']} 01 00 00 00{new_SN_hexstr}" + ' 00'*32
@@ -310,6 +326,7 @@ def set_serial(s, new_SN : str):
     sendcommand(s, command)
     set_SN = get_serial(s)
     print('newly set SN:', set_SN)
+    print('hint: SNs are not persistent and will be reset to 75d when powering off')
 
 
 def get_info(s):
@@ -318,27 +335,33 @@ def get_info(s):
     sendcommand(s, commands['req_info'])
     reply = recvreply(s)
     message, hwinfo = decode_reply(reply)
-    sn = hwinfo[6:17] # 4 byte
-    model_number = hwinfo[18:41] # 8 byte
-    hw_type = hwinfo[42:47] # 2 byte
-    fw_minor = hwinfo[48:50] # 1 byte
-    fw_interim = hwinfo[51:53] # 1 byte
-    fw_majorr = hwinfo[54:56] # 1 byte
-    hw_version = hwinfo[-17:-14] # 2 byte
-    mode_state = hwinfo[-12:-7] # 2 byte
-    n_channels = hwinfo[-5:] # 2 byte
-    print('raw hwinfo:', hwinfo)
+    sn = hexstr_to_int(hwinfo[0:11]) # 4 byte serial number
+    model_number = hexstr_to_ascii(hwinfo[12:35]) # 8 byte alphanumeric model number
+    hw_type = hexstr_to_int(hwinfo[36:41]) # 2 byte describes type of hardware
+    fw_minor = hexstr_to_int(hwinfo[42:44]) # minor firmware version (1 byte)
+    fw_interim = hexstr_to_int(hwinfo[45:47]) # interim firmware version (1 byte)
+    fw_major = hexstr_to_int(hwinfo[48:50]) # major firmware version (1 byte)
+    fw_reserved = hexstr_to_int(hwinfo[51:53]) # always 00
+    hw_version = hexstr_to_int(hwinfo[-17:-12]) # 2 byte hardware version
+    hw_mod_state = hexstr_to_int(hwinfo[-11:-6]) # 2 byte hardware modification state
+    n_channels = hexstr_to_int(hwinfo[-5:]) # 2 byte number of channels
+    print(f"serial number:\t\t{sn}\nmodel number:\t\t{model_number}\nfirmware version:\t{fw_major}.{fw_interim}.{fw_minor}")
+    print(f"hardware type:\t\t{hw_type}\nhardware version:\t{hw_version}")
+    print(f"modification state:\t{hw_mod_state}\nnumber of channels:\t{n_channels}")
 
 
 # %% ---------------------------------------------------------------------------
 # HARDWARE CHANNEL OUTPUT CONTROL FUNCTIONS
-# currently use the hardware channel commands, the KLC-specific seemed to not work on first try
+# enable/disable output, this needs to be combined with set_chan_mode
+# KLCs only have one channel so the argument is somewhat superfluous
 
 def get_hwchan_status(s, channel=1):
     """get hardware channel status"""
     if not s.is_open: print('no serial connection'); return
-    chan_command = f"{commands['req_HWchan_status'][0:7]}{channel}{commands['req_HWchan_status'][8:]}"
-    sendcommand(s, chan_command)
+    if channel != 1: print('invalid channel, using channel 1'); channel = 1
+    # chan_command = f"{commands['req_HWchan_status'][0:7]}{channel}{commands['req_HWchan_status'][8:]}"
+    # sendcommand(s, chan_command)
+    sendcommand(s, commands['req_HWchan_status'])
     reply = recvreply(s)
     channel_status = decode_reply(reply)
     if channel_status == '1':
@@ -352,16 +375,18 @@ def get_hwchan_status(s, channel=1):
 def en_hwchan(s, channel=1):
     """enable hardware channel"""
     if not s.is_open: print('no serial connection'); return
-    chan_command = f"{commands['enable_HWchan'][0:7]}{channel}{commands['enable_HWchan'][8:]}"
-    sendcommand(s, chan_command)
+    # chan_command = f"{commands['enable_HWchan'][0:7]}{channel}{commands['enable_HWchan'][8:]}"
+    # sendcommand(s, chan_command)
+    sendcommand(s, commands['enable_HWchan'])
     get_hwchan_status(s, channel)
 
 
 def dis_hwchan(s, channel=1):
     """disable hardware channel"""
     if not s.is_open: print('no serial connection'); return
-    chan_command = f"{commands['disable_HWchan'][0:7]}{channel}{commands['disable_HWchan'][8:]}"
-    sendcommand(s, chan_command)
+    # chan_command = f"{commands['disable_HWchan'][0:7]}{channel}{commands['disable_HWchan'][8:]}"
+    # sendcommand(s, chan_command)
+    sendcommand(s, commands['disable_HWchan'])
     get_hwchan_status(s, channel)
 
 
@@ -372,17 +397,13 @@ def lock_wheel(s):
     """lock device control wheel"""
     if not s.is_open: print('no serial connection'); return
     sendcommand(s, commands['lock_wheel'])
-    get_chan_status(s, channel)
     get_wheel_status(s)
 
 
 def unlock_wheel(s):
     """unlock device control wheel"""
-    
     if not s.is_open: print('no serial connection'); return
-    
     sendcommand(s, commands['unlock_wheel'])
-    get_chan_status(s, channel)
     get_wheel_status(s)
 
 
@@ -392,9 +413,9 @@ def get_wheel_status(s):
     sendcommand(s, commands['wheel_status'])
     reply = recvreply(s)
     lock_status = decode_reply(reply)
-    if lock_status == 1:
+    if lock_status == '1':
         print('device wheel locked')
-    elif lock_status == 2:
+    elif lock_status == '2':
         print('device wheel unlocked')
     else:
         print('invalid lock status')
@@ -406,6 +427,7 @@ def get_wheel_status(s):
 def set_voltage(s, voltage : float, channel=1):
     """set output voltage (0..25)"""
     if not s.is_open: print('no serial connection'); return
+    if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
     # check if voltage is within the limits, otherwise set it to min/max
     if (voltage < 0) or (voltage > 25):
         print('invalid voltage: ', str(voltage))
@@ -413,7 +435,6 @@ def set_voltage(s, voltage : float, channel=1):
         return
     
     voltage_hex = int_to_hexstr(voltage*1000)  # input in mV
-    # command = commands['set_voltage'] + f" 50 01 0{channel} 00 " + voltage_hex
     command = f"{commands['set_voltage']} 00 01 0{channel} 00 {voltage_hex}"
     sendcommand(s, command)
     if FLAG_DEBUG: print('voltage set')
@@ -422,6 +443,7 @@ def set_voltage(s, voltage : float, channel=1):
 def get_voltage(s, channel=1):
     """get output voltage"""
     if not s.is_open: print('no serial connection'); return
+    if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
     chan_command = f"{commands['req_voltage'][0:10]}{channel}{commands['req_voltage'][11:]}"
     sendcommand(s, chan_command)
     reply = recvreply(s)
@@ -435,6 +457,7 @@ def get_voltage(s, channel=1):
 def set_freq(s, frequency : int, channel=1):
     """set output frequency (500..10000 Hz)"""
     if not s.is_open: print('no serial connection'); return
+    if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
     # check if frequency is within the limits
     if (frequency < 500) or (frequency > 10000):
         print('invalid frequency: ', str(frequency))
@@ -451,6 +474,7 @@ def set_freq(s, frequency : int, channel=1):
 def get_freq(s, channel=1):
     """get output frequency"""
     if not s.is_open: print('no serial connection'); return
+    if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
     chan_command = f"{commands['req_frequency'][0:10]}{channel}{commands['req_frequency'][11:]}"
     sendcommand(s, chan_command)
     reply = recvreply(s)
@@ -471,17 +495,17 @@ def get_trigger_mode(s):
     reply = recvreply(s)
     trigger_mode = int(decode_reply(reply))
     if trigger_mode == 1:
-        ('trigger pin mode: Pin1 out, Pin2 out')
+        print('trigger pin mode: Pin1 out, Pin2 out')
     elif trigger_mode == 2:
-        ('trigger pin mode: Pin1 in, Pin2 out')
+        print('trigger pin mode: Pin1 in, Pin2 out')
     elif trigger_mode == 3:
-        ('trigger pin mode: Pin1 out, Pin2 in')
+        print('trigger pin mode: Pin1 out, Pin2 in')
     else:
-        ('invalid trigger_mode')
+        print('invalid trigger_mode')
     return trigger_mode
 
 
-def set_trigger_mode(s):
+def set_trigger_mode(s, mode):
     """set device trigger pin mode
     mode x01: pin1 out  pin2 out
     mode x02: pin1 in   pin2 out
@@ -531,11 +555,11 @@ def get_ADCparams(s):
     if not s.is_open: print('no serial connection'); return
     sendcommand(s, commands['req_ADCparams'])
     reply = recvreply(s)
-    message, message_params = decode_reply(reply)
-    ADC_error = hexstr_to_int(message_params[6:11], signed=True)
-    ADMAX_Value = hexstr_to_int(message_params[12:17], signed=False)
-    print('ADC error: ', ADC_error)
-    print('ADMAX value: ', ADMAX_Value)
+    message, ADCparams = decode_reply(reply)
+    ADC_error = hexstr_to_int(ADCparams[6:11], signed=True)
+    ADMAX_Value = hexstr_to_int(ADCparams[12:17], signed=False)
+    print(f"ADC error:\t{ADC_error}")
+    print(f"ADMAX value:\t{ADMAX_Value}")
     return ADC_error, ADMAX_Value
 
 
@@ -553,14 +577,14 @@ def set_swfreq(s, frequency):
         return
     
     freq_hex = int_to_hexstr(int(frequency*10))  # input is multiplied by 10!
-    # command = commands['set_swfreq'] + ' 50 01 0' + str(channel) + ' 00 ' + freq_hex
-    command = f"{commands['set_swfreq']} 01 00 {freq_hex}"
+    command = f"{commands['set_swfreq']} 01 00{freq_hex}"
     sendcommand(s, command)
+    print('switching frequency set to:', get_swfreq(s), ' Hz')
     if FLAG_DEBUG: print('switching frequency set to:', freq_hex)
 
 
 def get_swfreq(s):
-    """get switching frequency"""
+    """get switching frequency in Hz"""
     if not s.is_open: print('no serial connection'); return
     sendcommand(s, commands['req_swfreq'])
     reply = recvreply(s)
@@ -573,46 +597,42 @@ def get_swfreq(s):
 
 # %% ---------------------------------------------------------------------------
 # KLC CHANNEL OUTPUT CONTROL FUNCTIONS
-# seems as if channel needs to be 1
+# controls the output mode, enable and disable output with en/dis_hwchan
 
-def get_chan_status(s):
-    """get channel status"""
+def get_chan_mode(s):
+    """get channel mode"""
     if not s.is_open: print('no serial connection'); return
-    sendcommand(s, commands['req_chan_status'])
+    sendcommand(s, commands['req_chan_mode'])
     reply = recvreply(s)
-    channel_status = decode_reply(reply)
-    if channel_status == '0':
+    channel_mode = decode_reply(reply)
+    if channel_mode == '0':
         print('output disabled')
-    elif channel_status == '1':
-        print('output V1 enabled')
-    elif channel_status == '2':
-        print('output V2 enabled')
-    elif channel_status == '3':
-        print('output V1-V2 switching enabled')
+    elif channel_mode == '1':
+        print('output V1 set')
+    elif channel_mode == '2':
+        print('output V2 set')
+    elif channel_mode == '3':
+        print('output V1-V2 switching set')
     else:
         print('no reply, channel status unknown')
 
-def en_chan(s, mode=1):
-    """enable channel with specific output mode"""
+
+def set_chan_mode(s, mode=1):
+    """set channel with specific output mode"""
     if not s.is_open: print('no serial connection'); return
-    if mode == 1:
-        en_chan_command = commands['enable_chan_V1']
+    if mode == 0:
+        mode_command = commands['mode_chan_off']
+    elif mode == 1:
+        mode_command = commands['mode_chan_V1']
     elif mode == 2:
-        en_chan_command = commands['enable_chan_V2']
+        mode_command = commands['mode_chan_V2']
     elif mode == 3:
-        en_chan_command = commands['enable_chan_sw']
+        mode_command = commands['mode_chan_sw']
     else:
-        print('invalid mode, choose 1, 2, or 3')
+        print('invalid mode, choose 0, 1, 2, or 3')
         return
-    sendcommand(s, en_chan_command)
-    get_chan_status(s)
-
-
-def dis_chan(s):
-    """disable channel"""
-    if not s.is_open: print('no serial connection'); return
-    sendcommand(s, commands['disable_chan'])
-    get_chan_status(s)
+    sendcommand(s, mode_command)
+    get_chan_mode(s)
 
 
 # %% ---------------------------------------------------------------------------
@@ -633,45 +653,47 @@ def set_LUT_value(s, idx : int, voltage : int):
     
     voltage_hex = int_to_hexstr(voltage*1000)  # input in mV
     idx_hex = int_to_hexstr(idx)
-    command = commands['set_LUT_value'] + " 00 01 " + idx_hex + " " + voltage_hex
+    command = f"{commands['set_LUT_value']} 01 00{idx_hex}{voltage_hex}"
     sendcommand(s, command)
 
 
 def get_LUT_value(s, idx : int):
     """get single LUT value at specified index"""
-    # TBD: questionable according to documentation where to set the index
+    # the index is being set in the 4th byte which is only enough for 256 values
+    # no idea how to request the values from 256-511
     if not s.is_open: print('no serial connection'); return
     # check if index is within limits
     if (idx < 0) or (idx > 511):
         print('invalid index:', idx)
         print('select index in [0..511]')
         return
-    command = f"{commands['req_LUT_value']} 00 01 {idx_hex} 00 00"
-    # command = f"{commands['req_LUT_value']} 00 01 {idx_hex}"
+    if idx > 255: print('sorry, havent found out how to read out addresses 256-511') ; return
+    idx_hex = int_to_hexstr(idx, bytenum=1)
+    command = f"{commands['req_LUT_value'][0:8]}{idx_hex} {commands['req_LUT_value'][12:]}"
     sendcommand(s, command)
     reply = recvreply(s)
     message, message_params = decode_reply(reply)
-    # value just encoded in last two byte
-    voltage = hexstr_to_int(message_params[-5:]) / 1000
-    print('LUT voltage at index', idx, ':', voltage, 'V')
+    voltage = hexstr_to_int(message_params[-5:]) / 1000 # voltage encoded in last two byte
+    idx_read = hexstr_to_int(message_params[-11:-6]) # index encoded in the two before that
+    print('LUT voltage at index', idx_read, ':', voltage, 'V')
     return voltage
 
 
-def set_LUT_params(s, mode=1, cycle_length=1, num_cycles=1, delay_time=1, pre_cycle_rest=0):
+def set_LUT_params(s, mode=1, cycle_length=0, num_cycles=0, delay_time=0, pre_cycle_rest=0):
     """set LUT parameters
-    mode: 1=continuous, 2=fixed number of cycles
+    mode: 0=disabled 1=continuous, 2=fixed number of cycles
     cycle_length: 1..512 (number of samples)
     num_cycles: 1..2147483648 (4 byte) (number of cycles to output the LUT if mode=2)
     delay_time: 1..2147483648 (4 byte) (time waiting after setting each output value)
     pre_cycle_rest (delay time before starting the LUT output)
     """
+    mode_hex = int_to_hexstr(mode)
     cycle_length_hex = int_to_hexstr(cycle_length)
     num_cycles_hex = int_to_hexstr(num_cycles, bytenum=4)
     delay_time_hex = int_to_hexstr(delay_time, bytenum=4)
     pre_cycle_rest_hex = int_to_hexstr(pre_cycle_rest, bytenum=4)
-    command = f"{commands['set_LUT_params']} 00 01 0{mode} {cycle_length_hex} {num_cycles_hex} {delay_time_hex} {pre_cycle_rest_hex}" + " 00"*24
     # exactly following the documentation including the reserved bytes:
-    # command = f"{commands['set_LUT_params']} 00 01 0{mode} {cycle_length_hex} {num_cycles_hex} {delay_time_hex} {pre_cycle_rest_hex} 0a" + " 00"*5 + "01" + " 00"*5
+    command = f"{commands['set_LUT_params']} 01 00{mode_hex}{cycle_length_hex}{num_cycles_hex}{delay_time_hex}{pre_cycle_rest_hex} 0a" + " 00"*5 + " 01" + " 00"*5
     sendcommand(s, command)
 
 
@@ -687,34 +709,41 @@ def get_LUT_params(s):
     sendcommand(s, commands['req_LUT_params'])
     reply = recvreply(s)
     message, LUT_params = decode_reply(reply)
-    mode = int(LUT_params[25])
-    cycle_length = hexstr_to_int(LUT_params[30:35])
-    num_cycles = hexstr_to_int(LUT_params[36:47])
-    delay_time = hexstr_to_int(LUT_params[48:59])
-    pre_cycle_rest = hexstr_to_int(LUT_params[60:71])
-    print('mode:', mode, ' cycle_length:', cycle_length, ' num_cycles', num_cycles, 
-          ' delay_time', delay_time, ' pre_cycle_rest', pre_cycle_rest)
+    mode = int(LUT_params[7])
+    cycle_length = hexstr_to_int(LUT_params[12:17])
+    num_cycles = hexstr_to_int(LUT_params[18:29])
+    delay_time = hexstr_to_int(LUT_params[30:41])
+    pre_cycle_rest = hexstr_to_int(LUT_params[42:53])
+    print(f"mode:\t\t{mode}\ncycle_length:\t{cycle_length}\nnum_cycles:\t{num_cycles}") 
+    print(f"delay_time:\t{delay_time}\npre_cycle_rest:\t{pre_cycle_rest}")
 
 
 def start_LUT_output(s):
     """start LUT output"""
     if not s.is_open: print('no serial connection'); return
     sendcommand(s, commands['start_LUT_output'])
-    get_chan_status(s)
+    get_hwchan_status(s)
+    get_chan_mode(s)
+    print('starting LUT output with:')
+    get_LUT_params(s)
 
 
 def stop_LUT_output(s):
     """stop LUT output"""
     if not s.is_open: print('no serial connection'); return
     sendcommand(s, commands['stop_LUT_output'])
+    get_hwchan_status(s)
+    get_chan_mode(s)
 
 
 # %% ---------------------------------------------------------------------------
 # CONFIGURE ALL OPERATING PARAMETERS TOGETHER
 
-def set_output_status(s, voltage, frequency, frequency_flag=1):
+def set_output_status(s, mode=1, voltage=5, frequency=1000, frequency_flag=1):
     """set device output status:
-    frequency_flag: 0=no change, 1=frequency changed"""
+    mode: 0=disabled, 1=V1, 2=V2, 3=switching
+    frequency_flag: 0=no change, 1=frequency changed (seems to not matter really)
+    """
     if not s.is_open: print('no serial connection'); return
     # check if voltage is within the limits
     if (voltage < 0) or (voltage > 25):
@@ -726,18 +755,23 @@ def set_output_status(s, voltage, frequency, frequency_flag=1):
         print('invalid frequency: ', str(frequency))
         print('please set the frequency in Hz (500..10000)')
         return
+    if mode not in [0, 1, 2, 3]: print('select a valid mode: [0, 1, 2, 3]'); return
     
+    mode_hex = int_to_hexstr(mode)
     voltage_hex = int_to_hexstr(voltage*1000)
     frequency_hex = int_to_hexstr(frequency)
-    command = f"{commands['set_output_status']} 01 00 01 00 f{voltage_hex} f{frequency_hex} 0{frequency_flag} 00"
+    freq_flag_hex = int_to_hexstr(frequency_flag)
+    command = f"{commands['set_output_status']} 01 00{mode_hex}{voltage_hex}{frequency_hex}{freq_flag_hex}"
     sendcommand(s, command)
-    # get_output_status(s)
+    get_output_status(s)
+    get_chan_mode(s)
 
 
 def get_output_status(s):
     """get device output status:
     output_active: 0 or 1
-    error_flag: 1=DC offset error"""
+    error_flag: 1=DC offset error
+    """
     if not s.is_open: print('no serial connection'); return
     sendcommand(s, commands['req_output_status'])
     reply = recvreply(s)
@@ -746,8 +780,8 @@ def get_output_status(s):
     voltage = hexstr_to_int(status[12:17]) / 1000
     frequency = hexstr_to_int(status[18:23])
     error_flag = int(status[25])
-    print('channel', channel, ';  active:', outputactive, ';  errors:', error_flag)
-    print('set voltage:', voltage, 'V; ', 'set frequency:', frequency, 'Hz')
+    print(f"active:\t\t{output_active}\nerrors:\t\t{error_flag}")
+    print(f"voltage:\t{voltage} V\nfrequency:\t{frequency} Hz")
 
 
 # %% ---------------------------------------------------------------------------
@@ -777,30 +811,31 @@ def get_status_update(s):
     sendcommand(s, commands['req_status_update'])
     reply = recvreply(s)
     message, status = decode_reply(reply)
-    chan_state = int(status[25])
-    voltage1 = hexstr_to_int(status[30:35]) / 1000
-    frequency1 = hexstr_to_int(status[36:41])
-    voltage2 = hexstr_to_int(status[42:47]) / 1000
-    frequency2 = hexstr_to_int(status[48:53])
-    swfreq = hexstr_to_int(status[54:59]) / 10
-    disp_brightness = hexstr_to_int(status[60:65])
-    disp_timeout = hexstr_to_int(status[66:71], signed=True)
-    ADCmode = int(status[73])
-    trig_conf = int(status[79])
-    wheel_status = int(status[85])
-    error_flag = status[90:95]
-    print(message)
-    print(status)
-    print(chan_state, voltage1, frequency1, voltage2, frequency2, swfreq)
-    print(disp_brightness, disp_timeout)
-    print(ADCmode, trig_conf, wheel_status, error_flag)
+    chan_mode = int(status[7])
+    V1 = hexstr_to_int(status[12:17]) / 1000
+    f1 = hexstr_to_int(status[18:23])
+    V2 = hexstr_to_int(status[24:29]) / 1000
+    f2 = hexstr_to_int(status[30:35])
+    f_sw = hexstr_to_int(status[36:41]) / 10
+    disp_brightness = hexstr_to_int(status[42:47])
+    disp_timeout = hexstr_to_int(status[48:53], signed=True)
+    ADCmode = hexstr_to_int(status[54:59])
+    trig_conf = hexstr_to_int(status[60:65])
+    wheel_status = hexstr_to_int(status[66:71])
+    error_flag = hexstr_to_int(status[72:])
+    print(f"output mode:\t{chan_mode}")
+    print(f"V1={V1}V f1={f1}Hz\nV2={V2}V f2={f2}\nf_sw={f_sw}")
+    return chan_mode, V1, f1, V2, f2, f_sw
 
 
 # %% ---------------------------------------------------------------------------
 # DISPLAY PARAMETERS
 
 def get_disp_params(s):
-    """get display settings (brightness/timeout)"""
+    """get display settings (brightness/timeout)
+    timeout multiplies with roughly 30s per value
+    timeout=-1 means no timeout
+    """
     if not s.is_open: print('no serial connection'); return
     sendcommand(s, commands['req_kcube_params'])
     reply = recvreply(s)
@@ -811,8 +846,9 @@ def get_disp_params(s):
     if int(disp_timeout) == -1:
         print('display timeout: never')
     else:
-        print('display timeout: ', disp_timeout)
+        print('display timeout roughly: ', disp_timeout/2,  ' min')
     return disp_brightness, disp_timeout
+
 
 def set_disp_params(s, brightness=90, timeout=-1):
     """set display settings (brightness/timeout)"""
@@ -833,8 +869,9 @@ def set_disp_params(s, brightness=90, timeout=-1):
 # EEPROM SETTINGS
 
 def save_params(s):
-    """write parameters to eeprom"""
-    # seems to only save the operating parameters? TBD
+    """write parameters to eeprom
+    does not save the serial number, sadly
+    """
     if not s.is_open: print('no serial connection'); return
     print('are you sure you want to save the current parameters to EEPROM? (y/n)')
     userinput = input()
@@ -858,5 +895,6 @@ def restore_factory_settings(s):
             print('restoring factory settings')
             return
     print('aborted')
+
 
 # EOF --------------------------------------------------------------------------
