@@ -7,15 +7,14 @@ import serial
 import time
 import glob
 import sys
-import numpy as np
 
 # %% ---------------------------------------------------------------------------
 # KLC class
 class KLC () :
-    # only set this to True when you need a lot more output
-    FLAG_DEBUG = False
+    # set this to True when you need a lot more output
+    DEBUG = False
     
-    def __init__ (self, port='', SN='') :
+    def __init__ (self, port='', SN='', DEBUG=False) :
         self.ser = None
         # open serial connection
         if port:
@@ -28,6 +27,9 @@ class KLC () :
             # otherwise just pick the first found port
             self.openKLC()
         self.identify()
+        # more output info
+        if DEBUG: self.DEBUG = True
+    
     
     def __str__(self):
         return f"Is a serial instance of a KLC controller."
@@ -89,7 +91,7 @@ class KLC () :
         value_bytes = bytes.fromhex(value_hex)
         # convert bytes to signed integer, eg 'e8 03' becomes 1000 [mV/Hz]
         value_int = int.from_bytes(value_bytes, byteorder='little', signed=signed) 
-        if self.FLAG_DEBUG: print(value_bytes.hex(), value_int, )
+        if self.DEBUG: print(value_bytes.hex(), value_int, )
         return value_int
     
     
@@ -101,8 +103,8 @@ class KLC () :
         # convert to hex string with space at the beginning and in between
         value_hex = ''
         for n in range(bytenum):
-            value_hex = value_hex + ' ' + format(value_bytes[n], '02x')
-        if self.FLAG_DEBUG: print(value_bytes.hex(), value_hex)
+            value_hex = f"{value_hex} {value_bytes[n]:02X}"
+        if self.DEBUG: print(value_bytes.hex(), value_hex)
         return value_hex
     
     
@@ -193,7 +195,7 @@ class KLC () :
         if not self.ser.is_open: print('no serial connection'); return
         splitstring = cmd.split() # separate in to list of hex values
         cmd_ints = [int(str, 16) for str in splitstring] # convert to integer
-        if self.FLAG_DEBUG: print('sending command: ', cmd_ints)
+        if self.DEBUG: print('sending command: ', cmd_ints)
         self.ser.write(bytes(cmd_ints)) # send integer in binary format to stage
     
     
@@ -221,7 +223,7 @@ class KLC () :
         mID = reply[0:5] # get the first two bytes as message ID
         header = reply[0:17] # get the first 6 bytes as header
         message_params = ''
-        if self.FLAG_DEBUG: print(reply)
+        if self.DEBUG: print(reply)
         
         if mID == '02 00':
             message = 'pending disconnect'
@@ -313,7 +315,7 @@ class KLC () :
         message, message_params = self.decodereply(reply)
         serial_hex = message_params[12:24]  # serial number encoded in bytes 4..7 (starting at 0)
         serial_num = self.hexstr_to_int(serial_hex)
-        if self.FLAG_DEBUG:
+        if self.DEBUG:
             print('serial number: ', f"{serial_num:010d}")  # give out integer value
             print('raw reply:')
             print(reply)
@@ -341,7 +343,7 @@ class KLC () :
         # convert serial number
         new_SN_hexstr = self.int_to_hexstr(int(new_SN), bytenum=4)
         cmd = f"{self.cmds['set_serial']} 01 00 00 00{new_SN_hexstr}" + ' 00'*32
-        if self.FLAG_DEBUG:
+        if self.DEBUG:
             print(cmd)
         self.sendcmd(cmd)
         set_SN = self.get_serial()
@@ -458,7 +460,7 @@ class KLC () :
         voltage_hex = self.int_to_hexstr(voltage*1000)  # input in mV
         cmd = f"{self.cmds['set_voltage']} 00 01 0{channel} 00 {voltage_hex}"
         self.sendcmd(cmd)
-        if self.FLAG_DEBUG: print('voltage set')
+        if self.DEBUG: print('voltage set')
     
     
     def get_voltage(self, channel:int = 1):
@@ -471,7 +473,7 @@ class KLC () :
         message, message_params = self.decodereply(reply)
         # voltage just encoded in last two byte
         voltage = self.hexstr_to_int(message_params[-5:]) / 1000  # convert to V
-        if self.FLAG_DEBUG: print('set voltage:', voltage, 'V')
+        if self.DEBUG: print('set voltage:', voltage, 'V')
         return voltage
     
     
@@ -489,7 +491,7 @@ class KLC () :
         # cmd = self.cmds['set_frequency'] + ' 50 01 0' + str(channel) + ' 00 ' + freq_hex
         cmd = f"{self.cmds['set_frequency']} 00 01 0{channel} 00 {freq_hex}"
         self.sendcmd(cmd)
-        if self.FLAG_DEBUG: print('frequency set')
+        if self.DEBUG: print('frequency set')
     
     
     def get_freq(self, channel:int = 1):
@@ -502,7 +504,7 @@ class KLC () :
         message, message_params = self.decodereply(reply)
         # frequency just encoded in last two byte
         frequency = self.hexstr_to_int(message_params[-5:])
-        if self.FLAG_DEBUG: print('set frequency:', frequency, 'Hz')
+        if self.DEBUG: print('set frequency:', frequency, 'Hz')
         return frequency
     
     
@@ -600,7 +602,7 @@ class KLC () :
         freq_hex = self.int_to_hexstr(int(frequency*10))  # input is multiplied by 10!
         self.sendcmd(f"{self.cmds['set_swfreq']} 01 00{freq_hex}")
         print('switching frequency set to:', self.get_swfreq(), ' Hz')
-        if self.FLAG_DEBUG: print('switching frequency set to:', freq_hex)
+        if self.DEBUG: print('switching frequency set to:', freq_hex)
     
     
     def get_swfreq(self):
@@ -611,7 +613,7 @@ class KLC () :
         message, message_params = self.decodereply(reply)
         # switching frequency just encoded in last two byte
         swfreq = self.hexstr_to_int(message_params[-5:]) / 10  # value is stored as 10xHz
-        if self.FLAG_DEBUG: print('set switching frequency:', sfreq, 'Hz')
+        if self.DEBUG: print('set switching frequency:', sfreq, 'Hz')
         return swfreq
     
     
@@ -851,7 +853,7 @@ class KLC () :
     
     
     # --------------------------------------------------------------------------
-# DISPLAY PARAMETERS
+    # DISPLAY PARAMETERS
     
     def get_disp_params(self):
         """get display settings (brightness/timeout)
