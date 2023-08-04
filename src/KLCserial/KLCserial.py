@@ -26,7 +26,7 @@ class KLC () :
         else:
             # otherwise just pick the first found port
             self.openKLC()
-        self.identify()
+        if self.ser: self.identify()
         # more output info
         if DEBUG: self.DEBUG = True
     
