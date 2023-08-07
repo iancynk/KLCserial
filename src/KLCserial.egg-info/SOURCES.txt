@@ -1,9 +1,0 @@
-LICENSE
-README.md
-pyproject.toml
-src/KLCserial/__init__.py
-src/KLCserial/core.py
-src/KLCserial.egg-info/PKG-INFO
-src/KLCserial.egg-info/SOURCES.txt
-src/KLCserial.egg-info/dependency_links.txt
-src/KLCserial.egg-info/top_level.txt
