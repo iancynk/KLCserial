@@ -4,11 +4,7 @@
 # scripted by ian cynk (ian.cynk@posteo.eu) 2023
 # %% --------------------------------------------------------------------------
 # imports
-# if local file:
 from KLCserial import KLC
-# if installed via pip
-from KLCserial.KLCserial import KLC
-import time
 
 # %% --------------------------------------------------------------------------
 # connect controller

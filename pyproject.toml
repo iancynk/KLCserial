@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "KLCserial"
-version = "0.21"
+version = "0.22"
 authors = [
   { name="iancynk", email="ian.cynk@posteo.eu" },
 ]
 description = "Functions and examples to control Thorlabs KLC controllers (KLC101) through serial commands with Python"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",

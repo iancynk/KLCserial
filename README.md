@@ -14,28 +14,19 @@ pip install serial pyserial
 
 
 ## Usage
-### Pip
+
 Simply run
 ```
 pip install KLCserial
 ```
 Then in your Python script invoke the functions by
 ```
-from KLCserial.KLCserial import KLC
+from KLCserial import KLC
 klc = KLC()
 ```
 With `klc` you can then call all functions and methods of the controllers.
 
-### Download only file
-Download [KLCserial.py](src/KLCserial/KLCserial.py) and put it in your working directory. 
-
-Then in your Python script invoke the functions by
-```
-from KLCserial import KLC
-klc = KLC()
-```
-
-Then look at [example.py](example.py). There are a few more commands implemented than shown in the example but they appear not to be too helpful for most applications.
+Look at [example.py](example.py). There are a few more commands implemented than shown in the example but they appear not to be too helpful for most applications.
 
 
 ## Serial ports

@@ -128,8 +128,7 @@ class KLC () :
     
     # --------------------------------------------------------------------------
     # SERIAL FUNCTIONS
-
-    # create a serial connection with the recommended parameters
+    
     def openKLC(self, port='', SN = ''):
         """create a serial connection with the recommended parameters to either the defined port
         or to a specified serial number SN
@@ -176,32 +175,45 @@ class KLC () :
                 print('failed at port', port)
                 pass
         
-        if self.ser.is_open:
-            print('is open: ', self.ser.is_open)
-        else:
-            print('opening failed somehow')
+        if self.DEBUG:
+            if self.ser.is_open:
+                print(self.ser.port, 'is open: ', self.ser.is_open)
         return
     
     
-    # close serial connection
+    def port_is_open(self):
+        """ check whether serial port is open
+        returns False when closed or not a serial connection
+        """
+        try: 
+            if not self.ser.is_open:
+                print('serial port not open')
+                return False
+        except AttributeError:
+            print('no serial controller connected, ignoring command')
+            return False
+        return True
+    
+    
     def closeKLC(self):
-        if not self.ser.is_open: print('no serial connection'); return
+        """ close serial connection"""
+        if not self.port_is_open(): return
         self.ser.close()
         print('is open: ', self.ser.is_open)
     
     
-    # send a command
     def sendcmd(self, cmd:str):
-        if not self.ser.is_open: print('no serial connection'); return
+        """send a command"""
+        if not self.port_is_open(): return
         splitstring = cmd.split() # separate in to list of hex values
         cmd_ints = [int(str, 16) for str in splitstring] # convert to integer
         if self.DEBUG: print('sending command: ', cmd_ints)
         self.ser.write(bytes(cmd_ints)) # send integer in binary format to stage
     
     
-    # receive and parse reply
     def recvreply(self):
-        if not self.ser.is_open: print('no serial connection'); return
+        """receive and parse reply"""
+        if not self.port_is_open(): return
         time.sleep(0.04) # has to be at least 20 ms to work
         reply = ''
         while self.ser.in_waiting > 0:
@@ -212,90 +224,91 @@ class KLC () :
         return reply
     
     
-    # convert reply to readable info and split into individual messages
     def decodereply(self, reply):
+        """convert reply to readable info and split into individual messages"""
         # if no reply, return
         if not reply:
-            message = ''
-            print('no reply')
-            return message
+            msg = ''
+            params = ''
+            return msg, params
             
         mID = reply[0:5] # get the first two bytes as message ID
         header = reply[0:17] # get the first 6 bytes as header
-        message_params = ''
+        params = ''
         if self.DEBUG: print(reply)
         
-        if mID == '02 00':
-            message = 'pending disconnect'
-            length = 0
-        elif mID == '03 20':
-            message = 'output voltage'
-            length = 6
-        elif mID == '06 00':
-            message = 'hardware info'
-            length = 84
-        elif mID == '07 20':
-            message = 'output frequency'
-            length = 6
-        elif mID == '0a 20':
-            message = 'analog input mode'
-            analog_mode = reply[10]
-            return analog_mode
-        elif mID == '0d 20':
-            message = 'trigger pin mode'
-            trigger_pin_mode = reply[10]
-            return trigger_pin_mode
-        elif mID == '0f 20':
-            message = 'ADC parameters'
-            length = 6
-        elif mID == '12 02':
-            message = 'channel status'
-            channel = reply[7]
-            channel_status = reply[10]
-            return channel_status
-        elif mID == '12 20':
-            message = 'switching frequency'
-            length = 4
-        elif mID == '16 00':
-            message = 'serial number'
-            length = 40
-        elif mID == '18 20':
-            message = 'channel mode'
-            channel_mode = reply[10]
-            return channel_mode
-        elif mID == '22 20':
-            message = 'LUT value'
-            length = 6
-        elif mID == '25 20':
-            message = 'LUT parameters'
-            length = 30
-        elif mID == '30 20':
-            message = 'output status'
-            length = 10
-        elif mID == '42 20':
-            message = 'status update'
-            length = 26
-        elif mID == '52 02':
-            message = 'wheel lock status'
-            lock_status = reply[10]
-            return lock_status
-        elif mID== '81 00':
-            message = 'rich response' + reply[17:]
-            length = 64
-        elif mID == '82 20':
-            message = 'operating/display settings'
-            length = 10
-        else:
-            print('not a recognised message ID:', mID)
-            message = ''
-            length = 6
+        match mID: 
+            case '02 00':
+                msg = 'pending disconnect'
+                length = 0
+            case '03 20':
+                msg = 'output voltage'
+                length = 6
+            case '06 00':
+                msg = 'hardware info'
+                length = 84
+            case '07 20':
+                msg = 'output frequency'
+                length = 6
+            case '0a 20':
+                msg = 'analog input mode'
+                analog_mode = reply[10]
+                return msg, analog_mode
+            case '0d 20':
+                msg = 'trigger pin mode'
+                trigger_pin_mode = reply[10]
+                return msg, trigger_pin_mode
+            case '0f 20':
+                msg = 'ADC parameters'
+                length = 6
+            case '12 02':
+                msg = 'channel status'
+                channel = reply[7]
+                channel_status = reply[10]
+                return msg, channel_status
+            case '12 20':
+                msg = 'switching frequency'
+                length = 4
+            case '16 00':
+                msg = 'serial number'
+                length = 40
+            case '18 20':
+                msg = 'channel mode'
+                channel_mode = reply[10]
+                return msg, channel_mode
+            case '22 20':
+                msg = 'LUT value'
+                length = 6
+            case '25 20':
+                msg = 'LUT parameters'
+                length = 30
+            case '30 20':
+                msg = 'output status'
+                length = 10
+            case '42 20':
+                msg = 'status update'
+                length = 26
+            case '52 02':
+                msg = 'wheel lock status'
+                lock_status = reply[10]
+                return msg, lock_status
+            case '81 00':
+                msg = 'rich response' + reply[17:]
+                length = 64
+            case '82 20':
+                msg = 'operating/display settings'
+                length = 10
+            case _:
+                print('not a recognised msg ID:', mID)
+                msg = ''
+                length = 6
         
-        # combine message plus parameter (if more than 6 bytes)
+        # combine msg plus parameter (if more than 6 bytes)
         if length > 0:
-            message_params = reply[18:18+(3*length-1)]
-            return message, message_params
+            params = reply[18:18+(3*length-1)]
         else:
-            return message
+            params = ''
+        return msg, params
     
     
     # --------------------------------------------------------------------------
@@ -303,17 +316,17 @@ class KLC () :
     
     def identify(self):
         """flash display to indicate which controller is addressed"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['identify'])
     
     
     def get_serial(self):
         """get controller serial number"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['req_serial'])
         reply = self.recvreply()
-        message, message_params = self.decodereply(reply)
-        serial_hex = message_params[12:24]  # serial number encoded in bytes 4..7 (starting at 0)
+        msg, params = self.decodereply(reply)
+        serial_hex = params[12:24]  # serial number encoded in bytes 4..7 (starting at 0)
         serial_num = self.hexstr_to_int(serial_hex)
         if self.DEBUG:
             print('serial number: ', f"{serial_num:010d}")  # give out integer value
@@ -326,7 +339,7 @@ class KLC () :
     def set_serial(self, new_SN:str = '12345678'):
         """set controller serial number"""
         # weird structure: Data0: 01 00 00 00, Data1: serial number
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         # check if length is reasonable
         if len(new_SN) != 8:
             print('please select a serial number that is 8 digits long')
@@ -353,10 +366,10 @@ class KLC () :
     
     def get_info(self):
         """get hardware information, see APT protocol page 46"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['req_info'])
         reply = self.recvreply()
-        message, hwinfo = self.decodereply(reply)
+        msg, hwinfo = self.decodereply(reply)
         sn = self.hexstr_to_int(hwinfo[0:11]) # 4 byte serial number
         model_number = self.hexstr_to_ascii(hwinfo[12:35]) # 8 byte alphanumeric model number
         hw_type = self.hexstr_to_int(hwinfo[36:41]) # 2 byte describes type of hardware
@@ -379,13 +392,13 @@ class KLC () :
     
     def get_hwchan_status(self, channel=1):
         """get hardware channel status"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         if channel != 1: print('invalid channel, using channel 1'); channel = 1
         # chan_cmd = f"{self.cmds['req_HWchan_status'][0:7]}{channel}{self.cmds['req_HWchan_status'][8:]}"
         # self.sendcmd(chan_cmd)
         self.sendcmd(self.cmds['req_HWchan_status'])
         reply = self.recvreply()
-        channel_status = self.decodereply(reply)
+        msg, channel_status = self.decodereply(reply)
         if channel_status == '1':
             print('channel ', channel, ' enabled')
         elif channel_status == '2':
@@ -397,7 +410,7 @@ class KLC () :
     
     def en_hwchan(self, channel=1):
         """enable hardware channel"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         # chan_cmd = f"{self.cmds['enable_HWchan'][0:7]}{channel}{self.cmds['enable_HWchan'][8:]}"
         # self.sendcmd(chan_cmd)
         self.sendcmd(self.cmds['enable_HWchan'])
@@ -406,7 +419,7 @@ class KLC () :
     
     def dis_hwchan(self, channel=1):
         """disable hardware channel"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         # chan_cmd = f"{self.cmds['disable_HWchan'][0:7]}{channel}{self.cmds['disable_HWchan'][8:]}"
         # self.sendcmd(chan_cmd)
         self.sendcmd(self.cmds['disable_HWchan'])
@@ -418,24 +431,24 @@ class KLC () :
     
     def lock_wheel(self):
         """lock device control wheel"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['lock_wheel'])
         self.get_wheel_status()
     
     
     def unlock_wheel(self):
         """unlock device control wheel"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['unlock_wheel'])
         self.get_wheel_status()
     
     
     def get_wheel_status(self):
         """"get device control wheel lock status"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['wheel_status'])
         reply = self.recvreply()
-        lock_status = self.decodereply(reply)
+        msg, lock_status = self.decodereply(reply)
         if lock_status == '1':
             print('device wheel locked')
         elif lock_status == '2':
@@ -449,7 +462,7 @@ class KLC () :
     
     def set_voltage(self, voltage:float, channel:int = 1):
         """set output voltage (0..25)"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
         # check if voltage is within the limits, otherwise set it to min/max
         if (voltage < 0) or (voltage > 25):
@@ -465,21 +478,21 @@ class KLC () :
     
     def get_voltage(self, channel:int = 1):
         """get output voltage"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
         chan_cmd = f"{self.cmds['req_voltage'][0:10]}{channel}{self.cmds['req_voltage'][11:]}"
         self.sendcmd(chan_cmd)
         reply = self.recvreply()
-        message, message_params = self.decodereply(reply)
+        msg, params = self.decodereply(reply)
         # voltage just encoded in last two byte
-        voltage = self.hexstr_to_int(message_params[-5:]) / 1000  # convert to V
+        voltage = self.hexstr_to_int(params[-5:]) / 1000  # convert to V
         if self.DEBUG: print('set voltage:', voltage, 'V')
         return voltage
     
     
     def set_freq(self, frequency:int, channel:int = 1):
         """set output frequency (500..10000 Hz)"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
         # check if frequency is within the limits
         if (frequency < 500) or (frequency > 10000):
@@ -496,14 +509,14 @@ class KLC () :
     
     def get_freq(self, channel:int = 1):
         """get output frequency"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
         chan_cmd = f"{self.cmds['req_frequency'][0:10]}{channel}{self.cmds['req_frequency'][11:]}"
         self.sendcmd(chan_cmd)
         reply = self.recvreply()
-        message, message_params = self.decodereply(reply)
+        msg, params = self.decodereply(reply)
         # frequency just encoded in last two byte
-        frequency = self.hexstr_to_int(message_params[-5:])
+        frequency = self.hexstr_to_int(params[-5:])
         if self.DEBUG: print('set frequency:', frequency, 'Hz')
         return frequency
     
@@ -513,10 +526,10 @@ class KLC () :
     
     def get_trigger_mode(self):
         """get device trigger pin mode"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['req_trigger_mode'])
         reply = self.recvreply()
-        trigger_mode = int(self.decodereply(reply))
+        msg, trigger_mode = int(self.decodereply(reply))
         if trigger_mode == 1:
             print('trigger pin mode: Pin1 out, Pin2 out')
         elif trigger_mode == 2:
@@ -534,7 +547,7 @@ class KLC () :
         mode x02: pin1 in   pin2 out
         mode x03: pin1 out  pin2 in
         """
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         if (mode < 1) or (mode > 3):
             print('select a valid mode, meaning 1, 2 or 3')
             return
@@ -548,10 +561,10 @@ class KLC () :
     
     def get_ADCinmode(self):
         """get ADC input mode"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['req_ADCinmode'])
         reply = self.recvreply()
-        ADCinmode = int(self.decodereply(reply))
+        msg, ADCinmode = int(self.decodereply(reply))
         if ADCinmode:
             print('ADC input mode enabled')
         else:
@@ -561,24 +574,24 @@ class KLC () :
     
     def en_ADCinmode(self):
         """enable ADC input mode"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['enable_ADCinmode'])
         self.get_ADCinmode()
     
     
     def dis_ADCinmode(self):
         """disable ADC input mode"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['disable_ADCinmode'])
         self.get_ADCinmode()
     
     
     def get_ADCparams(self):
         """get ADC parameters"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['req_ADCparams'])
         reply = self.recvreply()
-        message, ADCparams = self.decodereply(reply)
+        msg, ADCparams = self.decodereply(reply)
         ADC_error = self.hexstr_to_int(ADCparams[6:11], signed=True)
         ADMAX_Value = self.hexstr_to_int(ADCparams[12:17], signed=False)
         print(f"ADC error:\t{ADC_error}")
@@ -592,7 +605,7 @@ class KLC () :
     
     def set_swfreq(self, frequency):
         """set switching frequency (0.1..150 Hz)"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         # check if switching frequency is within the limits
         if (frequency < 0.1) or (frequency > 150):
             print('invalid frequency: ', str(frequency))
@@ -607,12 +620,12 @@ class KLC () :
     
     def get_swfreq(self):
         """get switching frequency in Hz"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['req_swfreq'])
         reply = self.recvreply()
-        message, message_params = self.decodereply(reply)
+        msg, params = self.decodereply(reply)
         # switching frequency just encoded in last two byte
-        swfreq = self.hexstr_to_int(message_params[-5:]) / 10  # value is stored as 10xHz
+        swfreq = self.hexstr_to_int(params[-5:]) / 10  # value is stored as 10xHz
         if self.DEBUG: print('set switching frequency:', sfreq, 'Hz')
         return swfreq
     
@@ -623,10 +636,10 @@ class KLC () :
     
     def get_chan_mode(self):
         """get channel mode"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['req_chan_mode'])
         reply = self.recvreply()
-        channel_mode = self.decodereply(reply)
+        msg, channel_mode = self.decodereply(reply)
         if channel_mode == '0':
             print('output disabled')
         elif channel_mode == '1':
@@ -641,7 +654,7 @@ class KLC () :
     
     def set_chan_mode(self, mode=1):
         """set channel with specific output mode"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         if mode == 0:
             mode_cmd = self.cmds['mode_chan_off']
         elif mode == 1:
@@ -684,7 +697,7 @@ class KLC () :
         the index is being set in the 4th byte which is only enough for 256 values
         no idea how to request the values from 256-511
         """
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         # check if index is within limits
         if (idx < 0) or (idx > 511):
             print('invalid index:', idx)
@@ -695,9 +708,9 @@ class KLC () :
         cmd = f"{self.cmds['req_LUT_value'][0:8]}{idx_hex} {self.cmds['req_LUT_value'][12:]}"
         self.sendcmd(cmd)
         reply = self.recvreply()
-        message, message_params = self.decodereply(reply)
-        voltage = self.hexstr_to_int(message_params[-5:]) / 1000 # voltage encoded in last two byte
-        idx_read = self.hexstr_to_int(message_params[-11:-6]) # index encoded in the two before that
+        msg, params = self.decodereply(reply)
+        voltage = self.hexstr_to_int(params[-5:]) / 1000 # voltage encoded in last two byte
+        idx_read = self.hexstr_to_int(params[-11:-6]) # index encoded in the two before that
         print('LUT voltage at index', idx_read, ':', voltage, 'V')
         return voltage
     
@@ -728,10 +741,10 @@ class KLC () :
         delay_time: 1..2147483648 (4 byte) (time waiting after setting each output value)
         pre_cycle_rest (delay time before starting the LUT output)
         """
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['req_LUT_params'])
         reply = self.recvreply()
-        message, LUT_params = self.decodereply(reply)
+        msg, LUT_params = self.decodereply(reply)
         mode = int(LUT_params[7])
         cycle_length = self.hexstr_to_int(LUT_params[12:17])
         num_cycles = self.hexstr_to_int(LUT_params[18:29])
@@ -743,7 +756,7 @@ class KLC () :
     
     def start_LUT_output(self):
         """start LUT output"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['start_LUT_output'])
         self.get_hwchan_status()
         self.get_chan_mode()
@@ -753,7 +766,7 @@ class KLC () :
     
     def stop_LUT_output(self):
         """stop LUT output"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['stop_LUT_output'])
         self.get_hwchan_status()
         self.get_chan_mode()
@@ -768,7 +781,7 @@ class KLC () :
         frequency_flag: 0=no change, 1=frequency changed (seems to not matter really)
         currently only sets V1 and f1, presumably one bit will change the channel
         """
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         # check if voltage is within the limits
         if (voltage < 0) or (voltage > 25):
             print('invalid voltage: ', str(voltage))
@@ -796,10 +809,10 @@ class KLC () :
         output_active: 0 or 1
         error_flag: 1=DC offset error
         """
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['req_output_status'])
         reply = self.recvreply()
-        message, status = self.decodereply(reply)
+        msg, status = self.decodereply(reply)
         output_active = int(status[7])
         voltage = self.hexstr_to_int(status[12:17]) / 1000
         frequency = self.hexstr_to_int(status[18:23])
@@ -813,13 +826,13 @@ class KLC () :
     
     def en_status_update(self):
         """enable status update when device panel is used to change parameters"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['enable_status_update'])
     
     
     def dis_status_update(self):
         """disable status update when device panel is used to change parameters"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['disable_status_update'])
     
     
@@ -831,10 +844,10 @@ class KLC () :
         wheel_status: 0=unlocked, 1=locked
         error_flag: most likely the second digit is the only "DC offset error" flag
         """
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['req_status_update'])
         reply = self.recvreply()
-        message, status = self.decodereply(reply)
+        msg, status = self.decodereply(reply)
         chan_mode = int(status[7])
         V1 = self.hexstr_to_int(status[12:17]) / 1000
         f1 = self.hexstr_to_int(status[18:23])
@@ -860,10 +873,10 @@ class KLC () :
         timeout multiplies with roughly 30s per value
         timeout=-1 means no timeout
         """
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         self.sendcmd(self.cmds['req_kcube_params'])
         reply = self.recvreply()
-        message, disp_params = self.decodereply(reply)
+        msg, disp_params = self.decodereply(reply)
         disp_brightness = self.hexstr_to_int(disp_params[6:11])
         disp_timeout = self.hexstr_to_int(disp_params[12:17], signed=True)
         print('display brightness: ', disp_brightness)
@@ -878,7 +891,7 @@ class KLC () :
         """set display settings (brightness/timeout)
         to reset, just call without input values
         """
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         if (brightness < 0) or (brightness > 100):
             print('please choose a brightness in 0..100')
             return
@@ -898,7 +911,7 @@ class KLC () :
         """write parameters to eeprom
         does not save the serial number, sadly
         """
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         print('are you sure you want to save the current parameters to EEPROM? (y/n)')
         userinput = input()
         if userinput == 'y':
@@ -910,7 +923,7 @@ class KLC () :
     
     def restore_factory_settings(self):
         """restore factory settings"""
-        if not self.ser.is_open: print('no serial connection'); return
+        if not self.port_is_open(): return
         print('are you sure you want to restore factory settings? (y/n)')
         userinput = input()
         if userinput == 'y':
