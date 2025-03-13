@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "KLCserial"
-version = "0.22"
+version = "0.23"
 authors = [
   { name="iancynk", email="ian.cynk@posteo.eu" },
 ]

@@ -32,7 +32,7 @@ class KLC () :
     
     
     def __str__(self):
-        return f"Is a serial instance of a KLC controller."
+        return "Is a serial instance of a KLC controller."
         self.get_info()
     
     # --------------------------------------------------------------------------
@@ -171,7 +171,7 @@ class KLC () :
                 self.ser.open()
                 time.sleep(0.1)
                 break
-            except:
+            except FileNotFoundError:
                 print('failed at port', port)
                 pass
         
@@ -233,7 +233,7 @@ class KLC () :
             return msg, params
             
         mID = reply[0:5] # get the first two bytes as message ID
-        header = reply[0:17] # get the first 6 bytes as header
+        # header = reply[0:17] # get the first 6 bytes as header
         params = ''
         if self.DEBUG: print(reply)
         
@@ -263,7 +263,7 @@ class KLC () :
                 length = 6
             case '12 02':
                 msg = 'channel status'
-                channel = reply[7]
+                # channel = reply[7]
                 channel_status = reply[10]
                 return msg, channel_status
             case '12 20':
@@ -376,7 +376,7 @@ class KLC () :
         fw_minor = self.hexstr_to_int(hwinfo[42:44]) # minor firmware version (1 byte)
         fw_interim = self.hexstr_to_int(hwinfo[45:47]) # interim firmware version (1 byte)
         fw_major = self.hexstr_to_int(hwinfo[48:50]) # major firmware version (1 byte)
-        fw_reserved = self.hexstr_to_int(hwinfo[51:53]) # always 00
+        # fw_reserved = self.hexstr_to_int(hwinfo[51:53]) # always 00
         hw_version = self.hexstr_to_int(hwinfo[-17:-12]) # 2 byte hardware version
         hw_mod_state = self.hexstr_to_int(hwinfo[-11:-6]) # 2 byte hardware modification state
         n_channels = self.hexstr_to_int(hwinfo[-5:]) # 2 byte number of channels
@@ -463,7 +463,7 @@ class KLC () :
     def set_voltage(self, voltage:float, channel:int = 1):
         """set output voltage (0..25)"""
         if not self.port_is_open(): return
-        if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
+        if channel not in [1, 2]: print('invalid channel, select 1 or 2'); return
         # check if voltage is within the limits, otherwise set it to min/max
         if (voltage < 0) or (voltage > 25):
             print('invalid voltage: ', str(voltage))
@@ -479,7 +479,7 @@ class KLC () :
     def get_voltage(self, channel:int = 1):
         """get output voltage"""
         if not self.port_is_open(): return
-        if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
+        if channel not in [1, 2]: print('invalid channel, select 1 or 2'); return
         chan_cmd = f"{self.cmds['req_voltage'][0:10]}{channel}{self.cmds['req_voltage'][11:]}"
         self.sendcmd(chan_cmd)
         reply = self.recvreply()
@@ -493,7 +493,7 @@ class KLC () :
     def set_freq(self, frequency:int, channel:int = 1):
         """set output frequency (500..10000 Hz)"""
         if not self.port_is_open(): return
-        if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
+        if channel not in [1, 2]: print('invalid channel, select 1 or 2'); return
         # check if frequency is within the limits
         if (frequency < 500) or (frequency > 10000):
             print('invalid frequency: ', str(frequency))
@@ -510,7 +510,7 @@ class KLC () :
     def get_freq(self, channel:int = 1):
         """get output frequency"""
         if not self.port_is_open(): return
-        if not channel in [1, 2]: print('invalid channel, select 1 or 2'); return
+        if channel not in [1, 2]: print('invalid channel, select 1 or 2'); return
         chan_cmd = f"{self.cmds['req_frequency'][0:10]}{channel}{self.cmds['req_frequency'][11:]}"
         self.sendcmd(chan_cmd)
         reply = self.recvreply()
@@ -626,7 +626,7 @@ class KLC () :
         msg, params = self.decodereply(reply)
         # switching frequency just encoded in last two byte
         swfreq = self.hexstr_to_int(params[-5:]) / 10  # value is stored as 10xHz
-        if self.DEBUG: print('set switching frequency:', sfreq, 'Hz')
+        if self.DEBUG: print('set switching frequency:', swfreq, 'Hz')
         return swfreq
     
     
@@ -854,12 +854,12 @@ class KLC () :
         V2 = self.hexstr_to_int(status[24:29]) / 1000
         f2 = self.hexstr_to_int(status[30:35])
         f_sw = self.hexstr_to_int(status[36:41]) / 10
-        disp_brightness = self.hexstr_to_int(status[42:47])
-        disp_timeout = self.hexstr_to_int(status[48:53], signed=True)
-        ADCmode = self.hexstr_to_int(status[54:59])
-        trig_conf = self.hexstr_to_int(status[60:65])
-        wheel_status = self.hexstr_to_int(status[66:71])
-        error_flag = self.hexstr_to_int(status[72:])
+        # disp_brightness = self.hexstr_to_int(status[42:47])
+        # disp_timeout = self.hexstr_to_int(status[48:53], signed=True)
+        # ADCmode = self.hexstr_to_int(status[54:59])
+        # trig_conf = self.hexstr_to_int(status[60:65])
+        # wheel_status = self.hexstr_to_int(status[66:71])
+        # error_flag = self.hexstr_to_int(status[72:])
         print(f"output mode:\t{chan_mode}")
         print(f"V1={V1}V f1={f1}Hz\nV2={V2}V f2={f2}\nf_sw={f_sw}")
         return chan_mode, V1, f1, V2, f2, f_sw
